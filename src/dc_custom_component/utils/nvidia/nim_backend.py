@@ -1,10 +1,14 @@
 from typing import Any, Dict, List, Optional, Tuple
 
+import structlog
 import requests
 from haystack import Document
 from haystack.utils import Secret
 
 from .utils import REQUEST_TIMEOUT, Model
+
+
+logger = structlog.get_logger(__name__)
 
 
 class NimBackend:
@@ -41,16 +45,20 @@ class NimBackend:
     def embed(self, texts: List[str]) -> Tuple[List[List[float]], Dict[str, Any]]:
         url = f"{self.api_url}/embeddings"
 
-        res = self.session.post(
-            url,
-            json={
-                "model": self.model,
-                "input": texts,
-                **self.model_kwargs,
-            },
-            timeout=self.timeout,
-        )
-        res.raise_for_status()
+        try:
+            res = self.session.post(
+                url,
+                json={
+                    "model": self.model,
+                    "input": texts,
+                    **self.model_kwargs,
+                },
+                timeout=self.timeout,
+            )
+            res.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"Embedding request failed: {e.response.text}")
+            raise
 
         data = res.json()
         # Sort the embeddings by index, we don't know whether they're out of order or not
