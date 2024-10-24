@@ -1,3 +1,5 @@
+from collections import defaultdict
+import threading
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import gevent
@@ -31,6 +33,9 @@ class TritonBackend:
         self.model = model
         self.api_url = api_url
         self.backend_kwargs = backend_kwargs or {}
+        self.dedicated_thread_clients = self.backend_kwargs.get(
+            "dedicated_thread_clients", False
+        )
 
         if timeout is None:
             timeout = REQUEST_TIMEOUT
@@ -63,6 +68,13 @@ class TritonBackend:
             self.client = tritonclient.http.InferenceServerClient(
                 url=api_url, **client_kwargs
             )
+            self.thread_to_client: Dict[
+                int, tritonclient.http.InferenceServerClient
+            ] = defaultdict(
+                lambda: tritonclient.http.InferenceServerClient(
+                    url=api_url, **client_kwargs
+                )
+            )
 
     def embed(self, texts: List[str]) -> Tuple[List[List[float]], Dict[str, Any]]:
         inputs = []
@@ -72,7 +84,12 @@ class TritonBackend:
 
         infer_kwargs = self.backend_kwargs.get("infer_kwargs", {})
 
-        results = self.client.infer(
+        if self.dedicated_thread_clients:
+            client = self.thread_to_client[threading.get_ident()]
+        else:
+            client = self.client
+
+        results = client.infer(
             model_name=self.model,
             inputs=inputs,
             headers=self.headers,

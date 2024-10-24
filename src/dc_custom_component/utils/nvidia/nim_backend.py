@@ -1,14 +1,14 @@
 from typing import Any, Dict, List, Optional, Tuple
 
-import structlog
 import requests
 from haystack import Document
+from haystack.logging import getLogger
 from haystack.utils import Secret
 
 from .utils import REQUEST_TIMEOUT, Model
 
 
-logger = structlog.get_logger(__name__)
+logger = getLogger(__name__)
 
 
 class NimBackend:
@@ -57,7 +57,9 @@ class NimBackend:
             )
             res.raise_for_status()
         except requests.exceptions.HTTPError as e:
-            logger.error(f"Embedding request failed: {e.response.text}")
+            logger.error(
+                "Embedding request failed: {error_msg}", error_msg=e.response.text
+            )
             raise
 
         data = res.json()
