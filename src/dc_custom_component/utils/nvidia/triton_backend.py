@@ -18,6 +18,9 @@ with LazyImport("Run 'pip install tritonclient[grpc]'") as tritonclient_grpc:
     import tritonclient.grpc
 
 
+THREAD_LOCAL = threading.local()
+
+
 class TritonBackend:
     def __init__(
         self,
@@ -57,6 +60,9 @@ class TritonBackend:
             self.client = tritonclient.grpc.InferenceServerClient(
                 url=api_url, **client_kwargs
             )
+            self.triton_client_factory = lambda: tritonclient.grpc.InferenceServerClient(
+                url=api_url, **client_kwargs
+            )
         else:
             tritonclient_http.check()
             self.triton = tritonclient.http
@@ -68,13 +74,9 @@ class TritonBackend:
             self.client = tritonclient.http.InferenceServerClient(
                 url=api_url, **client_kwargs
             )
-            self.thread_to_client: Dict[
-                int, tritonclient.http.InferenceServerClient
-            ] = defaultdict(
-                lambda: tritonclient.http.InferenceServerClient(
+            self.triton_client_factory = lambda: tritonclient.http.InferenceServerClient(
                     url=api_url, **client_kwargs
                 )
-            )
 
     def embed(self, texts: List[str]) -> Tuple[List[List[float]], Dict[str, Any]]:
         inputs = []
@@ -85,7 +87,7 @@ class TritonBackend:
         infer_kwargs = self.backend_kwargs.get("infer_kwargs", {})
 
         if self.dedicated_thread_clients:
-            client = self.thread_to_client[threading.get_ident()]
+            client = self.get_dedicated_thread_client()
         else:
             client = self.client
 
@@ -100,6 +102,13 @@ class TritonBackend:
         embeddings = results.as_numpy("embeddings").tolist()
 
         return embeddings, {}
+
+    def get_dedicated_thread_client(self) -> tritonclient.http.InferenceServerClient | tritonclient.grpc.InferenceServerClient:
+        client = THREAD_LOCAL.__dict__.get("triton_client")
+        if client is None:
+            client = self.triton_client_factory()
+            THREAD_LOCAL.triton_client = client
+        return client
 
     def generate(self, prompt: str) -> Tuple[List[str], List[Dict[str, Any]]]:
         raise NotImplementedError()
