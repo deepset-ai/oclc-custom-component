@@ -1,4 +1,3 @@
-from collections import defaultdict
 import threading
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
@@ -60,8 +59,10 @@ class TritonBackend:
             self.client = tritonclient.grpc.InferenceServerClient(
                 url=api_url, **client_kwargs
             )
-            self.triton_client_factory = lambda: tritonclient.grpc.InferenceServerClient(
-                url=api_url, **client_kwargs
+            self.triton_client_factory = (
+                lambda: tritonclient.grpc.InferenceServerClient(
+                    url=api_url, **client_kwargs
+                )
             )
         else:
             tritonclient_http.check()
@@ -74,9 +75,11 @@ class TritonBackend:
             self.client = tritonclient.http.InferenceServerClient(
                 url=api_url, **client_kwargs
             )
-            self.triton_client_factory = lambda: tritonclient.http.InferenceServerClient(
+            self.triton_client_factory = (
+                lambda: tritonclient.http.InferenceServerClient(
                     url=api_url, **client_kwargs
                 )
+            )
 
     def embed(self, texts: List[str]) -> Tuple[List[List[float]], Dict[str, Any]]:
         inputs = []
@@ -103,7 +106,12 @@ class TritonBackend:
 
         return embeddings, {}
 
-    def get_dedicated_thread_client(self) -> tritonclient.http.InferenceServerClient | tritonclient.grpc.InferenceServerClient:
+    def get_dedicated_thread_client(
+        self,
+    ) -> (
+        tritonclient.http.InferenceServerClient
+        | tritonclient.grpc.InferenceServerClient
+    ):
         client = THREAD_LOCAL.__dict__.get("triton_client")
         if client is None:
             client = self.triton_client_factory()
