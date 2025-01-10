@@ -20,7 +20,7 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-  "haystack-ai>=2.0.0", "requests", "tritonclient[http,grpc]", "structlog",
+  "haystack-ai>=2.0.0", "requests", "tritonclient[http]", "structlog",
 ]
 dynamic = ["version"]
 
